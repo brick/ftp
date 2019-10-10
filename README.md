@@ -17,7 +17,7 @@ composer require brick/ftp
 
 ## Requirements
 
-This library requires PHP 7.2 or later.
+This library requires PHP 7.2 or later, and the [ftp](https://www.php.net/manual/en/book.ftp.php) extension.
 
 ## Project status & release process
 
