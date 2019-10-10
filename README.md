@@ -69,15 +69,15 @@ try {
 }
 ```
 
-Only the host name is required in `connect()`, the other values (port, SSL, timeout) are optional and default to the values above.
+**Only the host name is required** in `connect()`, the other values (port, SSL, timeout) are optional and default to the values above.
 
-#### What's passing mode?
+#### What's passive mode?
 
 Passive mode, known as the `PASV` FTP command, is a way to tell the server to open ports where the client can connect to, to upload/download a file.
 
-By default (passive mode not enabled), the client would open a local port and request the server to connect to the client instead.
+By default (passive mode not enabled), the client would open a local port and request the server to connect back to the client instead.
 
-This requires that the ports in question are not blocked by a firewall, and are directly open to the internet (no NAT). In practice, it's much easier to use passive mode as most FTP servers are already configured to support it.
+This requires that the ports in question are not blocked by a firewall, and are directly open to the internet (no NAT, or using port forwarding). In practice, it's much easier to use passive mode as most FTP servers are already configured to support it.
 
 #### Exception handling
 
@@ -86,7 +86,7 @@ As you've seen above, we wrap all calls to `FtpClient` methods in a try-catch bl
 ### Get the working directory
 
 ```php
-echo $client->getWorkingDirectory(); // /home/ftp-user
+echo $client->getWorkingDirectory(); // e.g. /home/ftp-user
 ```
 
 ### Set the working directory
@@ -119,6 +119,7 @@ Each value in the array returned by `listDirectory()` is an `FtpFileInfo` object
 
 If the server does not support the `MLSD` command, only the file name will be available.
 If the server does support this command, additional information will be available; which ones depends on the server.
+As a result, you should check if a property is `null` before attempting to use it, and act accordingly.
 
 Creation time and last modification time, if available, will be in either of these formats:
 
@@ -177,7 +178,7 @@ $client->download($localFile, $remoteFile);
 - `$localFile` can be either a `string` containing the local file name, or a `resource` containing a file pointer
 - `$remoteFile` is the path of the file on the FTP server
 
-This method accepts 2 additional, and optional, parameters:
+This method accepts 2 additional, optional parameters:
 
 - `$mode`: `FTP_BINARY` (default) or `FTP_ASCII` (see below for an explanation)
 - `$resumePos`: the position in the remote file to start downloading from (default `0`)
@@ -196,7 +197,7 @@ $client->upload($localFile, $remoteFile);
 - `$localFile` can be either a `string` containing the local file name, or a `resource` containing a file pointer
 - `$remoteFile` is the destination path of the file on the FTP server
 
-This method accepts 2 additional, and optional, parameters:
+This method accepts 2 additional, optional parameters:
 
 - `$mode`: `FTP_BINARY` (default) or `FTP_ASCII` (see above for an explanation)
 - `$startPos`: the position in the remote file to start uploading to (default `0`)
