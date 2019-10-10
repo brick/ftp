@@ -171,7 +171,7 @@ $size = $client->getSize('path/to/file'); // e.g. 123456
 ### Download a file
 
 ```php
-$client->get($localFile, $remoteFile);
+$client->download($localFile, $remoteFile);
 ```
 
 - `$localFile` can be either a `string` containing the local file name, or a `resource` containing a file pointer
@@ -190,7 +190,7 @@ This method accepts 2 additional, and optional, parameters:
 ### Upload a file
 
 ```php
-$client->put($localFile, $remoteFile);
+$client->upload($localFile, $remoteFile);
 ```
 
 - `$localFile` can be either a `string` containing the local file name, or a `resource` containing a file pointer

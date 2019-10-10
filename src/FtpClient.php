@@ -466,6 +466,8 @@ class FtpClient
     }
 
     /**
+     * Downloads a file from the FTP server.
+     *
      * @param string|resource $localFile  The local file path, or an open file pointer in which we store the data.
      *                                    If a path is provided, and the file already exists, it will be overwritten.
      * @param string          $remoteFile The remote file path.
@@ -476,11 +478,11 @@ class FtpClient
      *
      * @throws FtpException If not connected, or an error occurs.
      */
-    public function get($localFile, string $remoteFile, int $mode = FTP_BINARY, int $resumePos = 0) : void
+    public function download($localFile, string $remoteFile, int $mode = FTP_BINARY, int $resumePos = 0) : void
     {
         if (! is_string($localFile) && ! is_resource($localFile)) {
             throw new TypeError(sprintf(
-                'Argument 1 passed to get() must be of the type string|resource, %s given.',
+                'Argument 1 passed to download() must be of the type string|resource, %s given.',
                 gettype($localFile)
             ));
         }
@@ -499,6 +501,8 @@ class FtpClient
     }
 
     /**
+     * Uploads a file to the FTP server.
+     *
      * @param string|resource $localFile  The local file path, or an open file pointer on the local file.
      * @param string          $remoteFile The remote file path.
      * @param int             $mode       The transfer mode. Must be either FTP_ASCII or FTP_BINARY.
@@ -508,11 +512,11 @@ class FtpClient
      *
      * @throws FtpException If not connected, or an error occurs.
      */
-    public function put($localFile, string $remoteFile, int $mode = FTP_BINARY, int $startPos = 0) : void
+    public function upload($localFile, string $remoteFile, int $mode = FTP_BINARY, int $startPos = 0) : void
     {
         if (! is_string($localFile) && ! is_resource($localFile)) {
             throw new TypeError(sprintf(
-                'Argument 1 passed to get() must be of the type string|resource, %s given.',
+                'Argument 1 passed to upload() must be of the type string|resource, %s given.',
                 gettype($localFile)
             ));
         }
