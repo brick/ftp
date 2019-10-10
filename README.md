@@ -35,9 +35,11 @@ If you need to upgrade to a newer release cycle, check the [release history](htt
 
 This repo has only 3 classes, in the `Brick\Ftp` namespace:
 
-- `FtpClient` is the main class to interact with a FTP server
+- `FtpClient` is the main class to interact with an FTP server
 - `FtpException` is thrown if any operation fails
 - `FtpFileInfo` is returned when listing directories
+
+## Quickstart
 
 ### Connect & log in
 
@@ -104,7 +106,7 @@ foreach ($files as $file) {
 }
 ```
 
-Each value in the array returned by `listDirectory()` is an `FtpFileInfo` object. Depending on the capabilities of the FTP server, this may contain as little as only the file name, or additional information:
+Each value in the array returned by `listDirectory()` is an `FtpFileInfo` object. Depending on the capabilities of the FTP server, it may contain as little as only the file name, or additional information:
 
 | Property                | Type          | Nullable (optional)   | Description                                |
 | ----------------------- | ------------- | --------------------- | ------------------------------------------ |
@@ -138,24 +140,26 @@ foreach ($files as $path => $file) {
 }
 ```
 
-Please be aware that depending on the number of files and folders, this method may take a long time to execute.
+Please note that this depends on the ability for the client to differentiate between files and directories. As a result, if the server does not support the `MLSD` command, the result will always be an empty array.
 
-### Rename a file or directory
+Also, please be aware that depending on the number of files and directories, this method may take a long time to execute.
+
+### Rename a file or a directory
 
 ```php
-$lines = $client->rename('path/to/old_file', 'path/to/new_file');
+$client->rename('old/path/to/file', 'new/path/to/file');
 ```
 
 ### Delete a file
 
 ```php
-$lines = $client->delete('path/to/file');
+$client->delete('path/to/file');
 ```
 
 ### Remove a directory
 
 ```php
-$lines = $client->removeDirectory('path/to/directory');
+$client->removeDirectory('path/to/directory');
 ```
 
 ### Get the size of a file
@@ -167,26 +171,7 @@ $size = $client->getSize('path/to/file'); // e.g. 123456
 ### Download a file
 
 ```php
-$size = $client->get($localFile, $remoteFile); // e.g. 123456
-```
-
-- `$localFile` can be either a `string` containing the local file name, or a `resource` containing an open pointer to a file;
-- `$remoteFile` is the path of the file on the FTP server.
-
-This method accepts 2 additional, and optional, parameters:
-
-- `$mode`: `FTP_BINARY` (default) or `FTP_ASCII` (see below for an explanation)
-- `$resumePos`: the position in the remote file to start downloading from (default `0`)
-
-#### `FTP_BINARY` or `FTP_ASCII`?
-
-- `FTP_BINARY` transfers the file as is, without any modification, and is the default value.
-- `FTP_ASCII` converts newlines in the file (assuming it's a text file) to format expected by the target platform. You should usually not use this mode.
-
-### Downloading a file
-
-```php
-$size = $client->get($localFile, $remoteFile);
+$client->get($localFile, $remoteFile);
 ```
 
 - `$localFile` can be either a `string` containing the local file name, or a `resource` containing a file pointer
@@ -197,10 +182,15 @@ This method accepts 2 additional, and optional, parameters:
 - `$mode`: `FTP_BINARY` (default) or `FTP_ASCII` (see below for an explanation)
 - `$resumePos`: the position in the remote file to start downloading from (default `0`)
 
-### Uploading a file
+#### `FTP_BINARY` or `FTP_ASCII`?
+
+- `FTP_BINARY` transfers the file as is, without any modification, and is the default value.
+- `FTP_ASCII` converts newlines in the file (assuming it's a text file) to the format expected by the target platform. You should usually not use this mode.
+
+### Upload a file
 
 ```php
-$size = $client->put($localFile, $remoteFile);
+$client->put($localFile, $remoteFile);
 ```
 
 - `$localFile` can be either a `string` containing the local file name, or a `resource` containing a file pointer
