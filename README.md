@@ -30,3 +30,223 @@ The current releases are numbered `0.x.y`. When a non-breaking change is introdu
 It is therefore safe to lock your project to a given release cycle, such as `0.1.*`.
 
 If you need to upgrade to a newer release cycle, check the [release history](https://github.com/brick/ftp/releases) for a list of changes introduced by each further `0.x.0` version.
+
+## Package contents
+
+This repo has only 3 classes, in the `Brick\Ftp` namespace:
+
+- `FtpClient` is the main class to interact with a FTP server
+- `FtpException` is thrown if any operation fails
+- `FtpFileInfo` is returned when listing directories
+
+### Connect & log in
+
+```php
+use Brick\Ftp\FtpClient;
+use Brick\Ftp\FtpException;
+
+try {
+    $client = new FtpClient();
+
+    $host    = 'ftp.example.com'; // FTP server host name
+    $port    = 21;                // FTP server port
+    $ssl     = false;             // whether to open a secure SSL connection
+    $timeout = 90;                // timeout in seconds
+
+    $username = 'ftp-user';
+    $password = 'p@ssw0rd';
+
+    $client->connect($host, $port, $ssl, $timeout);
+    $client->login($username, $password);
+
+    // You usually want to set passive mode (PASV) on,
+    // if you're behind a NAT or firewall; see below for an explanation
+    $client->setPassive(true);
+} catch (FtpException $e) {
+    // An error occurred!
+}
+```
+
+Only the host name is required in `connect()`, the other values (port, SSL, timeout) are optional and default to the values above.
+
+#### What's passing mode?
+
+Passive mode, known as the `PASV` FTP command, is a way to tell the server to open ports where the client can connect to, to upload/download a file.
+
+By default (passive mode not enabled), the client would open a local port and request the server to connect to the client instead.
+
+This requires that the ports in question are not blocked by a firewall, and are directly open to the internet (no NAT). In practice, it's much easier to use passive mode as most FTP servers are already configured to support it.
+
+#### Exception handling
+
+As you've seen above, we wrap all calls to `FtpClient` methods in a try-catch block. We won't do this in subsequent examples below for conciseness, but you should catch `FtpException` in *every* call to `FtpClient` methods, or you application will exit with "Uncaught Exception" if any error occurs.
+
+### Get the working directory
+
+```php
+echo $client->getWorkingDirectory(); // /home/ftp-user
+```
+
+### Set the working directory
+
+```php
+$client->setWorkingDirectory('/home/ftp-user/archive');
+```
+
+### List a directory
+
+```php
+$files = $client->listDirectory('.');
+
+foreach ($files as $file) {
+    // $file is an FtpFileInfo object
+    echo $file->name, PHP_EOL;
+}
+```
+
+Each value in the array returned by `listDirectory()` is an `FtpFileInfo` object. Depending on the capabilities of the FTP server, this may contain as little as only the file name, or additional information:
+
+| Property                | Type          | Nullable (optional)   | Description                                |
+| ----------------------- | ------------- | --------------------- | ------------------------------------------ |
+| `$name`                 | `string`      | No                    | The file name                              |
+| `$isDir`                | `bool`        | *Yes*                 | `true` for a directory, `false` for a file |
+| `$size`                 | `int`         | *Yes*                 | The file size, in bytes                    |
+| `$creationTime`         | `string`      | *Yes*                 | The creation time                          |
+| `$lastModificationTime` | `string`      | *Yes*                 | The last modification time                 |
+| `$uniqueId`             | `string`      | *Yes*                 | A unique identifier for the file           |
+
+If the server does not support the `MLSD` command, only the file name will be available.
+If the server does support this command, additional information will be available; which ones depends on the server.
+
+Creation time and last modification time, if available, will be in either of these formats:
+
+- `YYYYMMDDHHMMSS`
+- `YYYYMMDDHHMMSS.sss`
+
+### Recursively list all files under a given directory
+
+This will traverse the given directory and all of its subdirectories, and return all files found.
+
+Just like `listDirectory()`, the result is an array of `FtpFileInfo` objects, but the keys of the array are the path to the file, *relative to the given directory*.
+
+```php
+$files = $client->recursivelyListFilesInDirectory('.');
+
+foreach ($files as $path => $file) {
+    echo $path, PHP_EOL; // a/b/c.txt
+    echo $file->name, PHP_EOL; // c.txt
+}
+```
+
+Please be aware that depending on the number of files and folders, this method may take a long time to execute.
+
+### Rename a file or directory
+
+```php
+$lines = $client->rename('path/to/old_file', 'path/to/new_file');
+```
+
+### Delete a file
+
+```php
+$lines = $client->delete('path/to/file');
+```
+
+### Remove a directory
+
+```php
+$lines = $client->removeDirectory('path/to/directory');
+```
+
+### Get the size of a file
+
+```php
+$size = $client->getSize('path/to/file'); // e.g. 123456
+```
+
+### Download a file
+
+```php
+$size = $client->get($localFile, $remoteFile); // e.g. 123456
+```
+
+- `$localFile` can be either a `string` containing the local file name, or a `resource` containing an open pointer to a file;
+- `$remoteFile` is the path of the file on the FTP server.
+
+This method accepts 2 additional, and optional, parameters:
+
+- `$mode`: `FTP_BINARY` (default) or `FTP_ASCII` (see below for an explanation)
+- `$resumePos`: the position in the remote file to start downloading from (default `0`)
+
+#### `FTP_BINARY` or `FTP_ASCII`?
+
+- `FTP_BINARY` transfers the file as is, without any modification, and is the default value.
+- `FTP_ASCII` converts newlines in the file (assuming it's a text file) to format expected by the target platform. You should usually not use this mode.
+
+### Downloading a file
+
+```php
+$size = $client->get($localFile, $remoteFile);
+```
+
+- `$localFile` can be either a `string` containing the local file name, or a `resource` containing a file pointer
+- `$remoteFile` is the path of the file on the FTP server
+
+This method accepts 2 additional, and optional, parameters:
+
+- `$mode`: `FTP_BINARY` (default) or `FTP_ASCII` (see below for an explanation)
+- `$resumePos`: the position in the remote file to start downloading from (default `0`)
+
+### Uploading a file
+
+```php
+$size = $client->put($localFile, $remoteFile);
+```
+
+- `$localFile` can be either a `string` containing the local file name, or a `resource` containing a file pointer
+- `$remoteFile` is the destination path of the file on the FTP server
+
+This method accepts 2 additional, and optional, parameters:
+
+- `$mode`: `FTP_BINARY` (default) or `FTP_ASCII` (see above for an explanation)
+- `$startPos`: the position in the remote file to start uploading to (default `0`)
+
+### Send a raw command
+
+If for any reason, you need to send a raw FTP command to the server, this method is for you.
+The result is an array of all lines in the response returned by the server.
+
+Note that this method does not check if the server response contains an error code, it always returns the raw output.
+
+```php
+$lines = $client->sendRawCommand('FEAT');
+
+foreach ($lines as $line) {
+    echo $line, PHP_EOL;
+}
+```
+
+Sample response:
+
+```
+211- Extensions supported:
+ AUTH TLS
+ PBSZ
+ PROT
+ CCC
+ SIZE
+ MDTM
+ REST STREAM
+ MFMT
+ TVFS
+ MLST
+ MLSD
+ UTF8
+211 End.
+```
+
+### Close the connection
+
+```php
+$client->close();
+```
