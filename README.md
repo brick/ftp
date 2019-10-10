@@ -177,7 +177,7 @@ $client->download($localFile, $remoteFile);
 - `$localFile` can be either a `string` containing the local file name, or a `resource` containing a file pointer
 - `$remoteFile` is the path of the file on the FTP server
 
-This method accepts 2 additional, and optional, parameters:
+This method accepts 2 additional, optional parameters:
 
 - `$mode`: `FTP_BINARY` (default) or `FTP_ASCII` (see below for an explanation)
 - `$resumePos`: the position in the remote file to start downloading from (default `0`)
@@ -196,7 +196,7 @@ $client->upload($localFile, $remoteFile);
 - `$localFile` can be either a `string` containing the local file name, or a `resource` containing a file pointer
 - `$remoteFile` is the destination path of the file on the FTP server
 
-This method accepts 2 additional, and optional, parameters:
+This method accepts 2 additional, optional parameters:
 
 - `$mode`: `FTP_BINARY` (default) or `FTP_ASCII` (see above for an explanation)
 - `$startPos`: the position in the remote file to start uploading to (default `0`)
