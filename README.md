@@ -61,8 +61,7 @@ try {
     $client->connect($host, $port, $ssl, $timeout);
     $client->login($username, $password);
 
-    // You usually want to set passive mode (PASV) on,
-    // if you're behind a NAT or firewall; see below for an explanation
+    // You usually want to set passive mode (PASV) on; see below for an explanation
     $client->setPassive(true);
 } catch (FtpException $e) {
     // An error occurred!
@@ -162,6 +161,8 @@ $client->delete('path/to/file');
 ```php
 $client->removeDirectory('path/to/directory');
 ```
+
+The directory must be empty, or an exception is thrown.
 
 ### Get the size of a file
 
