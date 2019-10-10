@@ -1,0 +1,19 @@
+{
+  "name": "brick/ftp",
+  "description": "FTP client for PHP",
+  "type": "library",
+  "keywords": [
+    "Brick",
+    "FTP",
+    "FTPs"
+  ],
+  "license": "MIT",
+  "require": {
+    "php": ">=7.2"
+  },
+  "autoload": {
+    "psr-4": {
+      "Brick\\Ftp\\": "src/"
+    }
+  }
+}
