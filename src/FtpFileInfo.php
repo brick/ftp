@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Brick\Ftp\FtpClient;
+namespace Brick\Ftp;
 
 /**
  * Holds information about a remote file or directory on a FTP server.

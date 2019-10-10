@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Brick\Ftp\FtpClient;
+namespace Brick\Ftp;
 
 use Exception;
 

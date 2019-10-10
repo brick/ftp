@@ -1,6 +1,6 @@
 <?php
 
-namespace Brick\Ftp\FtpClient;
+namespace Brick\Ftp;
 
 use TypeError;
 
