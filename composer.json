@@ -14,7 +14,7 @@
   },
   "autoload": {
     "psr-4": {
-      "Brick\\Ftp\\": "src/"
+      "Brick\\Ftp\\FtpClient\\": "src/"
     }
   }
 }
