@@ -60,6 +60,16 @@ class FtpClient
     }
 
     /**
+     * Returns whether a connection is currently open.
+     *
+     * @return bool
+     */
+    public function isConnected() : bool
+    {
+        return $this->conn !== null;
+    }
+
+    /**
      * Logs in to the FTP connection.
      *
      * @param string $username
