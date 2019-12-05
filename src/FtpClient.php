@@ -219,7 +219,7 @@ class FtpClient
      */
     private function mlsdFactsToFileInfo(array $facts) : ?FtpFileInfo
     {
-        $name = $facts['name'];
+        $name = $this->stripPathFromFileName($facts['name']);
 
         if ($name === '.' || $name === '..') {
             return null;
@@ -290,6 +290,8 @@ class FtpClient
         $result = [];
 
         foreach ($files as $file) {
+            $file = $this->stripPathFromFileName($file);
+
             if ($file === '.' || $file === '..') {
                 continue;
             }
@@ -301,6 +303,28 @@ class FtpClient
         }
 
         return $result;
+    }
+
+    private function stripPathFromFileName(string $path) : string
+    {
+        $pos1 = strrpos($path, '/');
+        $pos2 = strrpos($path, '\\');
+
+        if ($pos1 === false && $pos2 === false) {
+            return $path;
+        }
+
+        if ($pos1 !== false) {
+            if ($pos2 !== false) {
+                $pos = max($pos1, $pos2);
+            } else {
+                $pos = $pos1;
+            }
+        } else {
+            $pos = $pos2;
+        }
+
+        return substr($path, $pos + 1);
     }
 
     /**
