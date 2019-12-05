@@ -174,20 +174,25 @@ class FtpClient
     {
         $this->throwIfNotConnected();
 
+        $records = false;
+
         try {
             $records = $this->call(true, 'ftp_mlsd', $this->conn, $directory);
         } catch (FtpException $e) {
-            if (substr($e->getMessage(), 0, 3) === '500') {
-                // MLSD command not supported
-                return $this->basicListDirectory($directory);
-            } else {
-                // Other error, re-throw
+            if (substr($e->getMessage(), 0, 3) !== '500') {
+                // MLSD command supported, but an error occurred
                 throw $e;
+            } else {
+                // MLSD command not supported; ignore the exception
             }
         }
 
         if ($records === false) {
-            throw new FtpException('Unable to get file list.');
+            // Note: ftp_mlsd() may return false without a warning, even when the server returns a 500 response
+            // to the MLSD command (not supported); therefore, at this point we cannot guarantee that we got there
+            // because of the MLSD command not being supported, or because an unknown error occurred; in any case, we
+            // have no other choice but to fall back to the basic directory listing, whatever the error.
+            return $this->basicListDirectory($directory);
         }
 
         $result = [];
