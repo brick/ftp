@@ -209,6 +209,296 @@ class FtpClient
     }
 
     /**
+     * Lists all files in the given directory and its subdirectories.
+     *
+     * Directories and files with unknown types are not returned in the output. As a result, if the server does not
+     * support the MLSD command (allowing to get file info), the result will always be an empty array.
+     *
+     * The resulting array of FtpFileInfo objects is indexed by path relative to the given directory,
+     * for example given these files:
+     *
+     * /a/b/c/foo.txt
+     * /a/b/c/d/bar.txt
+     *
+     * recursivelyListFilesInDirectory('/a/b') would return [
+     *   'c/foo.txt' => (FtpFileInfo object),
+     *   'c/d/bar.txt' => (FtpFileInfo object)
+     * ]
+     *
+     * @param string $directory
+     *
+     * @return FtpFileInfo[]
+     *
+     * @throws FtpException
+     */
+    public function recursivelyListFilesInDirectory(string $directory) : array
+    {
+        $result = $this->doRecursivelyListFilesInDirectory($directory);
+
+        $trimLength = strlen($directory) + 1;
+
+        $newResult = [];
+
+        foreach ($result as $path => $file) {
+            $newPath = substr($path, $trimLength);
+            $newResult[$newPath] = $file;
+        }
+
+        return $newResult;
+    }
+
+    /**
+     * Sends an arbitrary command to the FTP server.
+     *
+     * Returns the server's response as an array of strings. No parsing is performed on the response string.
+     * Note that this method cannot determine if the command succeeded.
+     *
+     * @param string $command
+     *
+     * @return string[]
+     *
+     * @throws FtpException If not connected, or an unknown error occurs.
+     */
+    public function sendRawCommand(string $command) : array
+    {
+        $this->throwIfNotConnected();
+
+        return $this->call(true, 'ftp_raw', $this->conn, $command);
+    }
+
+    /**
+     * Renames a file or a directory on the FTP server.
+     *
+     * @param string $oldname The old file/directory name.
+     * @param string $newname The new name.
+     *
+     * @return void
+     *
+     * @throws FtpException If not connected, or renaming fails.
+     */
+    public function rename(string $oldname, string $newname) : void
+    {
+        $this->throwIfNotConnected();
+
+        $success = $this->call(true, 'ftp_rename', $this->conn, $oldname, $newname);
+
+        if (! $success) {
+            throw new FtpException("Unable to rename $oldname to $newname.");
+        }
+    }
+
+    /**
+     * Deletes a file on the FTP server.
+     *
+     * @param string $path The remote file path.
+     *
+     * @return void
+     *
+     * @throws FtpException If not connected, or deleting fails.
+     */
+    public function delete(string $path) : void
+    {
+        $this->throwIfNotConnected();
+
+        $success = $this->call(true, 'ftp_delete', $this->conn, $path);
+
+        if (! $success) {
+            throw new FtpException("Unable to delete file $path.");
+        }
+    }
+
+    /**
+     * Removes a directory on the FTP server.
+     *
+     * @param string $path The remote file path.
+     *
+     * @return void
+     *
+     * @throws FtpException If not connected, or removal fails.
+     */
+    public function removeDirectory(string $path) : void
+    {
+        $this->throwIfNotConnected();
+
+        $success = $this->call(true, 'ftp_rmdir', $this->conn, $path);
+
+        if (! $success) {
+            throw new FtpException("Unable to remove directory $path.");
+        }
+    }
+
+    /**
+     * Returns the size of the given file.
+     *
+     * @param string $remoteFile The remote file.
+     *
+     * @return int The file size.
+     *
+     * @throws FtpException If not connected, or an error occurs.
+     */
+    public function getFileSize(string $remoteFile) : int
+    {
+        $this->throwIfNotConnected();
+        $this->throwIfNotExists($remoteFile);
+
+        $size = $this->call(true, 'ftp_size', $this->conn, $remoteFile);
+
+        if ($size === -1) {
+            throw new FtpException(sprintf("$remoteFile is a directory, %s() works only with regular files.", __FUNCTION__));
+        }
+
+        return $size;
+    }
+
+    /**
+     * Downloads a file from the FTP server.
+     *
+     * @param string|resource $localFile  The local file path, or an open file pointer in which we store the data.
+     *                                    If a path is provided, and the file already exists, it will be overwritten.
+     * @param string          $remoteFile The remote file path.
+     * @param int             $mode       The transfer mode. Must be either FTP_ASCII or FTP_BINARY.
+     * @param int             $resumePos  The position in the remote file to start downloading from.
+     *
+     * @return void
+     *
+     * @throws FtpException If not connected, or an error occurs.
+     */
+    public function download($localFile, string $remoteFile, int $mode = FTP_BINARY, int $resumePos = 0) : void
+    {
+        if (! is_string($localFile) && ! is_resource($localFile)) {
+            throw new TypeError(sprintf(
+                'Argument 1 passed to download() must be of the type string|resource, %s given.',
+                gettype($localFile)
+            ));
+        }
+
+        $this->throwIfNotConnected();
+
+        if (is_string($localFile)) {
+            $success = $this->call(true, 'ftp_get', $this->conn, $localFile, $remoteFile, $mode, $resumePos);
+        } else {
+            $success = $this->call(true, 'ftp_fget', $this->conn, $localFile, $remoteFile, $mode, $resumePos);
+        }
+
+        if (! $success) {
+            throw new FtpException("Unable to download file $remoteFile to $localFile.");
+        }
+    }
+
+    /**
+     * Uploads a file to the FTP server.
+     *
+     * @param string|resource $localFile  The local file path, or an open file pointer on the local file.
+     * @param string          $remoteFile The remote file path.
+     * @param int             $mode       The transfer mode. Must be either FTP_ASCII or FTP_BINARY.
+     * @param int             $startPos   The position in the remote file to start uploading to.
+     *
+     * @return void
+     *
+     * @throws FtpException If not connected, or an error occurs.
+     */
+    public function upload($localFile, string $remoteFile, int $mode = FTP_BINARY, int $startPos = 0) : void
+    {
+        if (! is_string($localFile) && ! is_resource($localFile)) {
+            throw new TypeError(sprintf(
+                'Argument 1 passed to upload() must be of the type string|resource, %s given.',
+                gettype($localFile)
+            ));
+        }
+
+        $this->throwIfNotConnected();
+
+        if (is_string($localFile)) {
+            $success = $this->call(true, 'ftp_put', $this->conn, $remoteFile, $localFile, $mode, $startPos);
+        } else {
+            $success = $this->call(true, 'ftp_fput', $this->conn, $remoteFile, $localFile, $mode, $startPos);
+        }
+
+        if (! $success) {
+            throw new FtpException("Unable to upload file $localFile to $remoteFile.");
+        }
+    }
+
+    /**
+     * Checks if the giving file exists on the server.
+     *
+     * @param string $remoteFile
+     *
+     * @return bool
+     *
+     * @throws FtpException If not connected, or an error occurs.
+     */
+    public function isExists($remoteFile) : bool
+    {
+        $this->throwIfNotConnected();
+
+        $list = $this->call(false, 'ftp_nlist', $this->conn, dirname($remoteFile));
+
+        return $list ? in_array(basename($remoteFile), $list) : false;
+    }
+
+    /**
+     * Gets extended command features to RFC959 supported by the remote server.
+     *
+     * @return array
+     *
+     * @throws FtpException If not connected, or an unknown error occurs.
+     */
+    public function getFeatures() : array
+    {
+        $this->throwIfNotConnected();
+
+        $feats = [];
+        $lines = $this->sendRawCommand('FEAT');
+
+        foreach ($lines as $line) {
+            $feats[] = trim($line);
+        }
+
+        return array_slice($feats, 1, -1);
+    }
+
+    /**
+     * Checks whether the giving path is a directory.
+     *
+     * @param string $remoteFile
+     *
+     * @return bool
+     *
+     * @throws FtpException If not connected, or an unknown error occurs.
+     */
+    public function isDir(string $remoteFile) : bool
+    {
+        $this->throwIfNotConnected();
+        $this->throwIfNotExists($remoteFile);
+
+        $originalDir = $this->call(true, 'ftp_pwd', $this->conn);
+
+        // Attempt to change the current directory to $remoteFile.
+        // Suppress errors in case $remoteFile is a file or an error occurs.
+        if (! @ftp_chdir($this->conn, $remoteFile)) {
+            return false;
+        }
+
+        // Finally get back to the original directory
+        return $this->call(true, 'ftp_chdir', $this->conn, $originalDir);
+    }
+
+    /**
+     * Returns whether the giving path is a regular file.
+     *
+     * @param string $remoteFile
+     *
+     * @return bool
+     *
+     * @throws FtpException If not connected, or an unknown error occurs.
+     */
+    public function isFile(string $remoteFile) : bool
+    {
+        return !$this->isDir($remoteFile);
+    }
+
+    /**
      * Converts MLSD facts to a FtpFileInfo object.
      *
      * If the file should be skipped, null is returned.
@@ -328,45 +618,6 @@ class FtpClient
     }
 
     /**
-     * Lists all files in the given directory and its subdirectories.
-     *
-     * Directories and files with unknown types are not returned in the output. As a result, if the server does not
-     * support the MLSD command (allowing to get file info), the result will always be an empty array.
-     *
-     * The resulting array of FtpFileInfo objects is indexed by path relative to the given directory,
-     * for example given these files:
-     *
-     * /a/b/c/foo.txt
-     * /a/b/c/d/bar.txt
-     *
-     * recursivelyListFilesInDirectory('/a/b') would return [
-     *   'c/foo.txt' => (FtpFileInfo object),
-     *   'c/d/bar.txt' => (FtpFileInfo object)
-     * ]
-     *
-     * @param string $directory
-     *
-     * @return FtpFileInfo[]
-     *
-     * @throws FtpException
-     */
-    public function recursivelyListFilesInDirectory(string $directory) : array
-    {
-        $result = $this->doRecursivelyListFilesInDirectory($directory);
-
-        $trimLength = strlen($directory) + 1;
-
-        $newResult = [];
-
-        foreach ($result as $path => $file) {
-            $newPath = substr($path, $trimLength);
-            $newResult[$newPath] = $file;
-        }
-
-        return $newResult;
-    }
-
-    /**
      * Internal method for recursivelyListFilesInDirectory()
      *
      * @param string $directory
@@ -403,177 +654,6 @@ class FtpClient
     }
 
     /**
-     * Sends an arbitrary command to the FTP server.
-     *
-     * Returns the server's response as an array of strings. No parsing is performed on the response string.
-     * Note that this method cannot determine if the command succeeded.
-     *
-     * @param string $command
-     *
-     * @return string[]
-     *
-     * @throws FtpException If not connected, or an unknown error occurs.
-     */
-    public function sendRawCommand(string $command) : array
-    {
-        $this->throwIfNotConnected();
-
-        return $this->call(true, 'ftp_raw', $this->conn, $command);
-    }
-
-    /**
-     * Renames a file or a directory on the FTP server.
-     *
-     * @param string $oldname The old file/directory name.
-     * @param string $newname The new name.
-     *
-     * @return void
-     *
-     * @throws FtpException If not connected, or renaming fails.
-     */
-    public function rename(string $oldname, string $newname) : void
-    {
-        $this->throwIfNotConnected();
-
-        $success = $this->call(true, 'ftp_rename', $this->conn, $oldname, $newname);
-
-        if (! $success) {
-            throw new FtpException("Unable to rename $oldname to $newname.");
-        }
-    }
-
-    /**
-     * Deletes a file on the FTP server.
-     *
-     * @param string $path The remote file path.
-     *
-     * @return void
-     *
-     * @throws FtpException If not connected, or deleting fails.
-     */
-    public function delete(string $path) : void
-    {
-        $this->throwIfNotConnected();
-
-        $success = $this->call(true, 'ftp_delete', $this->conn, $path);
-
-        if (! $success) {
-            throw new FtpException("Unable to delete file $path.");
-        }
-    }
-
-    /**
-     * Removes a directory on the FTP server.
-     *
-     * @param string $path The remote file path.
-     *
-     * @return void
-     *
-     * @throws FtpException If not connected, or removal fails.
-     */
-    public function removeDirectory(string $path) : void
-    {
-        $this->throwIfNotConnected();
-
-        $success = $this->call(true, 'ftp_rmdir', $this->conn, $path);
-
-        if (! $success) {
-            throw new FtpException("Unable to remove directory $path.");
-        }
-    }
-
-    /**
-     * Returns the size of the given file.
-     *
-     * @param string $path The remote file path.
-     *
-     * @return int The file size.
-     *
-     * @throws FtpException If not connected, or an error occurs.
-     */
-    public function getSize(string $path) : int
-    {
-        $this->throwIfNotConnected();
-
-        $size = $this->call(true, 'ftp_size', $this->conn, $path);
-
-        if ($size === -1) {
-            throw new FtpException("Unable to get size of file $path.");
-        }
-
-        return $size;
-    }
-
-    /**
-     * Downloads a file from the FTP server.
-     *
-     * @param string|resource $localFile  The local file path, or an open file pointer in which we store the data.
-     *                                    If a path is provided, and the file already exists, it will be overwritten.
-     * @param string          $remoteFile The remote file path.
-     * @param int             $mode       The transfer mode. Must be either FTP_ASCII or FTP_BINARY.
-     * @param int             $resumePos  The position in the remote file to start downloading from.
-     *
-     * @return void
-     *
-     * @throws FtpException If not connected, or an error occurs.
-     */
-    public function download($localFile, string $remoteFile, int $mode = FTP_BINARY, int $resumePos = 0) : void
-    {
-        if (! is_string($localFile) && ! is_resource($localFile)) {
-            throw new TypeError(sprintf(
-                'Argument 1 passed to download() must be of the type string|resource, %s given.',
-                gettype($localFile)
-            ));
-        }
-
-        $this->throwIfNotConnected();
-
-        if (is_string($localFile)) {
-            $success = $this->call(true, 'ftp_get', $this->conn, $localFile, $remoteFile, $mode, $resumePos);
-        } else {
-            $success = $this->call(true, 'ftp_fget', $this->conn, $localFile, $remoteFile, $mode, $resumePos);
-        }
-
-        if (! $success) {
-            throw new FtpException("Unable to download file $remoteFile to $localFile.");
-        }
-    }
-
-    /**
-     * Uploads a file to the FTP server.
-     *
-     * @param string|resource $localFile  The local file path, or an open file pointer on the local file.
-     * @param string          $remoteFile The remote file path.
-     * @param int             $mode       The transfer mode. Must be either FTP_ASCII or FTP_BINARY.
-     * @param int             $startPos   The position in the remote file to start uploading to.
-     *
-     * @return void
-     *
-     * @throws FtpException If not connected, or an error occurs.
-     */
-    public function upload($localFile, string $remoteFile, int $mode = FTP_BINARY, int $startPos = 0) : void
-    {
-        if (! is_string($localFile) && ! is_resource($localFile)) {
-            throw new TypeError(sprintf(
-                'Argument 1 passed to upload() must be of the type string|resource, %s given.',
-                gettype($localFile)
-            ));
-        }
-
-        $this->throwIfNotConnected();
-
-        if (is_string($localFile)) {
-            $success = $this->call(true, 'ftp_put', $this->conn, $remoteFile, $localFile, $mode, $startPos);
-        } else {
-            $success = $this->call(true, 'ftp_fput', $this->conn, $remoteFile, $localFile, $mode, $startPos);
-        }
-
-        if (! $success) {
-            throw new FtpException("Unable to upload file $localFile to $remoteFile.");
-        }
-    }
-
-    /**
      * @return void
      *
      * @throws FtpException If no connection is currently open.
@@ -582,6 +662,20 @@ class FtpClient
     {
         if (! $this->conn) {
             throw new FtpException('No FTP connection is currently open.');
+        }
+    }
+
+    /**
+     * @param string $remoteFile
+     *
+     * @return void
+     *
+     * @throws FtpException
+     */
+    private function throwIfNotExists($remoteFile) : void
+    {
+        if (! $this->isExists($remoteFile)) {
+            throw new FtpException("$remoteFile doesn't exists on the server.");
         }
     }
 
@@ -598,11 +692,7 @@ class FtpClient
      */
     private function call(bool $throw, callable $function, ...$parameters)
     {
-        if ($throw) {
-            set_error_handler([$this, 'errorHandlerException']);
-        } else {
-            set_error_handler([$this, 'errorHandlerIgnore']);
-        }
+        set_error_handler([$this, $throw ? 'errorHandlerException' : 'errorHandlerIgnore']);
 
         try {
             return call_user_func_array($function, $parameters);
