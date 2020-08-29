@@ -367,6 +367,42 @@ class FtpClient
     }
 
     /**
+     * Internal method for recursivelyListFilesInDirectory()
+     *
+     * @param string $directory
+     *
+     * @return FtpFileInfo[]
+     *
+     * @throws FtpException
+     */
+    private function doRecursivelyListFilesInDirectory(string $directory) : array
+    {
+        $result = [];
+
+        $files = $this->listDirectory($directory);
+
+        foreach ($files as $file) {
+            if ($file->isDir === null) {
+                continue;
+            }
+
+            $path = $directory . '/' . $file->name;
+
+            if ($file->isDir) {
+                $filesInDir = $this->doRecursivelyListFilesInDirectory($path);
+
+                foreach ($filesInDir as $pathInDir => $fileInDir) {
+                    $result[$pathInDir] = $fileInDir;
+                }
+            } else {
+                $result[$path] = $file;
+            }
+        }
+
+        return $result;
+    }
+
+    /**
      * Sends an arbitrary command to the FTP server.
      *
      * Returns the server's response as an array of strings. No parsing is performed on the response string.
@@ -615,42 +651,6 @@ class FtpClient
     public function isFile(string $remoteFile) : bool
     {
         return !$this->isDir($remoteFile);
-    }
-
-    /**
-     * Internal method for recursivelyListFilesInDirectory()
-     *
-     * @param string $directory
-     *
-     * @return FtpFileInfo[]
-     *
-     * @throws FtpException
-     */
-    private function doRecursivelyListFilesInDirectory(string $directory) : array
-    {
-        $result = [];
-
-        $files = $this->listDirectory($directory);
-
-        foreach ($files as $file) {
-            if ($file->isDir === null) {
-                continue;
-            }
-
-            $path = $directory . '/' . $file->name;
-
-            if ($file->isDir) {
-                $filesInDir = $this->doRecursivelyListFilesInDirectory($path);
-
-                foreach ($filesInDir as $pathInDir => $fileInDir) {
-                    $result[$pathInDir] = $fileInDir;
-                }
-            } else {
-                $result[$path] = $file;
-            }
-        }
-
-        return $result;
     }
 
     /**
