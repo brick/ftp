@@ -209,6 +209,125 @@ class FtpClient
     }
 
     /**
+     * Converts MLSD facts to a FtpFileInfo object.
+     *
+     * If the file should be skipped, null is returned.
+     *
+     * @param array $facts
+     *
+     * @return FtpFileInfo|null
+     */
+    private function mlsdFactsToFileInfo(array $facts) : ?FtpFileInfo
+    {
+        $name = $this->stripPathFromFileName($facts['name']);
+
+        if ($name === '.' || $name === '..') {
+            return null;
+        }
+
+        $fileInfo = new FtpFileInfo;
+        $fileInfo->name = $name;
+
+        if (isset($facts['size'])) {
+            $fileInfo->size = (int) $facts['size'];
+        }
+
+        if (isset($facts['create'])) {
+            $fileInfo->creationTime = $facts['create'];
+        }
+
+        if (isset($facts['modify'])) {
+            $fileInfo->lastModificationTime = $facts['modify'];
+        }
+
+        if (isset($facts['unique'])) {
+            $fileInfo->uniqueId = $facts['unique'];
+        }
+
+        if (isset($facts['type'])) {
+            switch ($facts['type']) {
+                case 'file':
+                    $fileInfo->isDir = false;
+                    break;
+
+                case 'dir':
+                    $fileInfo->isDir = true;
+                    break;
+
+                case 'cdir': // the listed directory
+                case 'pdir': // a parent directory
+                    // these should already be excluded with "." and "..", but this extra check is free
+                    return null;
+
+                default:
+                    // unknown type; leaving the default:
+                    // $fileInfo->isDir = null;
+            }
+        }
+
+        return $fileInfo;
+    }
+
+    /**
+     * Returns a basic directory listing (file name only).
+     *
+     * This method ignores "." and ".." directories, if returned by the server.
+     *
+     * @param string $directory
+     *
+     * @return FtpFileInfo[]
+     *
+     * @throws FtpException If an error occurs.
+     */
+    private function basicListDirectory(string $directory) : array
+    {
+        $files = $this->call(true, 'ftp_nlist', $this->conn, $directory);
+
+        if ($files === false) {
+            throw new FtpException('Unable to get file list.');
+        }
+
+        $result = [];
+
+        foreach ($files as $file) {
+            $file = $this->stripPathFromFileName($file);
+
+            if ($file === '.' || $file === '..') {
+                continue;
+            }
+
+            $fileInfo = new FtpFileInfo;
+            $fileInfo->name = $file;
+
+            $result[] = $fileInfo;
+        }
+
+        return $result;
+    }
+
+    private function stripPathFromFileName(string $path) : string
+    {
+        $pos1 = strrpos($path, '/');
+        $pos2 = strrpos($path, '\\');
+
+        if ($pos1 === false && $pos2 === false) {
+            return $path;
+        }
+
+        if ($pos1 !== false) {
+            if ($pos2 !== false) {
+                $pos = max($pos1, $pos2);
+            } else {
+                $pos = $pos1;
+            }
+        } else {
+            $pos = $pos2;
+        }
+
+        return substr($path, $pos + 1);
+    }
+
+    /**
      * Lists all files in the given directory and its subdirectories.
      *
      * Directories and files with unknown types are not returned in the output. As a result, if the server does not
@@ -496,125 +615,6 @@ class FtpClient
     public function isFile(string $remoteFile) : bool
     {
         return !$this->isDir($remoteFile);
-    }
-
-    /**
-     * Converts MLSD facts to a FtpFileInfo object.
-     *
-     * If the file should be skipped, null is returned.
-     *
-     * @param array $facts
-     *
-     * @return FtpFileInfo|null
-     */
-    private function mlsdFactsToFileInfo(array $facts) : ?FtpFileInfo
-    {
-        $name = $this->stripPathFromFileName($facts['name']);
-
-        if ($name === '.' || $name === '..') {
-            return null;
-        }
-
-        $fileInfo = new FtpFileInfo;
-        $fileInfo->name = $name;
-
-        if (isset($facts['size'])) {
-            $fileInfo->size = (int) $facts['size'];
-        }
-
-        if (isset($facts['create'])) {
-            $fileInfo->creationTime = $facts['create'];
-        }
-
-        if (isset($facts['modify'])) {
-            $fileInfo->lastModificationTime = $facts['modify'];
-        }
-
-        if (isset($facts['unique'])) {
-            $fileInfo->uniqueId = $facts['unique'];
-        }
-
-        if (isset($facts['type'])) {
-            switch ($facts['type']) {
-                case 'file':
-                    $fileInfo->isDir = false;
-                    break;
-
-                case 'dir':
-                    $fileInfo->isDir = true;
-                    break;
-
-                case 'cdir': // the listed directory
-                case 'pdir': // a parent directory
-                    // these should already be excluded with "." and "..", but this extra check is free
-                    return null;
-
-                default:
-                    // unknown type; leaving the default:
-                    // $fileInfo->isDir = null;
-            }
-        }
-
-        return $fileInfo;
-    }
-
-    /**
-     * Returns a basic directory listing (file name only).
-     *
-     * This method ignores "." and ".." directories, if returned by the server.
-     *
-     * @param string $directory
-     *
-     * @return FtpFileInfo[]
-     *
-     * @throws FtpException If an error occurs.
-     */
-    private function basicListDirectory(string $directory) : array
-    {
-        $files = $this->call(true, 'ftp_nlist', $this->conn, $directory);
-
-        if ($files === false) {
-            throw new FtpException('Unable to get file list.');
-        }
-
-        $result = [];
-
-        foreach ($files as $file) {
-            $file = $this->stripPathFromFileName($file);
-
-            if ($file === '.' || $file === '..') {
-                continue;
-            }
-
-            $fileInfo = new FtpFileInfo;
-            $fileInfo->name = $file;
-
-            $result[] = $fileInfo;
-        }
-
-        return $result;
-    }
-
-    private function stripPathFromFileName(string $path) : string
-    {
-        $pos1 = strrpos($path, '/');
-        $pos2 = strrpos($path, '\\');
-
-        if ($pos1 === false && $pos2 === false) {
-            return $path;
-        }
-
-        if ($pos1 !== false) {
-            if ($pos2 !== false) {
-                $pos = max($pos1, $pos2);
-            } else {
-                $pos = $pos1;
-            }
-        } else {
-            $pos = $pos2;
-        }
-
-        return substr($path, $pos + 1);
     }
 
     /**
