@@ -494,12 +494,11 @@ class FtpClient
     public function getFileSize(string $remoteFile) : int
     {
         $this->throwIfNotConnected();
-        $this->throwIfNotExists($remoteFile);
 
         $size = $this->call(true, 'ftp_size', $this->conn, $remoteFile);
 
         if ($size === -1) {
-            throw new FtpException(sprintf("$remoteFile is a directory, %s() works only with regular files.", __FUNCTION__));
+            throw new FtpException("Unable to get size of file $remoteFile.");
         }
 
         return $size;
@@ -583,7 +582,7 @@ class FtpClient
      *
      * @throws FtpException If not connected, or an error occurs.
      */
-    public function isExists($remoteFile) : bool
+    public function isExists(string $remoteFile) : bool
     {
         $this->throwIfNotConnected();
 
@@ -593,7 +592,7 @@ class FtpClient
     }
 
     /**
-     * Gets extended command features to RFC959 supported by the remote server.
+     * Gets extended command features to the RFC959 supported by the remote server.
      *
      * @return array
      *
@@ -625,12 +624,11 @@ class FtpClient
     public function isDir(string $remoteFile) : bool
     {
         $this->throwIfNotConnected();
-        $this->throwIfNotExists($remoteFile);
 
         $originalDir = $this->call(true, 'ftp_pwd', $this->conn);
 
-        // Attempt to change the current directory to $remoteFile.
-        // Suppress errors in case $remoteFile is a file or an error occurs.
+        // Attempt to change the current directory to $remoteFile
+        // Suppress errors in case $remoteFile is a file or an error occurs
         if (! @ftp_chdir($this->conn, $remoteFile)) {
             return false;
         }
@@ -666,20 +664,6 @@ class FtpClient
     }
 
     /**
-     * @param string $remoteFile
-     *
-     * @return void
-     *
-     * @throws FtpException
-     */
-    private function throwIfNotExists($remoteFile) : void
-    {
-        if (! $this->isExists($remoteFile)) {
-            throw new FtpException("$remoteFile doesn't exists on the server.");
-        }
-    }
-
-    /**
      * Executes the given function, catching errors and throwing them as exceptions.
      *
      * @param bool     $throw         Whether or not to throw an exception (true) or ignore (false) on error.
@@ -692,7 +676,11 @@ class FtpClient
      */
     private function call(bool $throw, callable $function, ...$parameters)
     {
-        set_error_handler([$this, $throw ? 'errorHandlerException' : 'errorHandlerIgnore']);
+        if ($throw) {
+            set_error_handler([$this, 'errorHandlerException']);
+        } else {
+            set_error_handler([$this, 'errorHandlerIgnore']);
+        }
 
         try {
             return call_user_func_array($function, $parameters);
